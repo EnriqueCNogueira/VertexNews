@@ -1,0 +1,18 @@
+Definição do Projeto: Pipeline Inteligente de Notícias de Marketing
+
+Este projeto visa construir um sistema automatizado (um "pipeline") capaz de coletar, processar, analisar e apresentar notícias relevantes do setor de marketing digital. A finalidade principal é transformar um grande volume de informações dispersas na web em insights valiosos, facilitando a criação de conteúdo estratégico para redes sociais, como o Instagram.
+
+Etapas principais do Projeto:
+1. Configuração inicial: Preparar o ambiente e importar as ferramentas (bibliotecas Python) necessárias para todo o processo.
+2. Coleta de dados: Obter links e metadados básicos de notícias de diversas fontes web usando web scraping (Requests + BeautifulSoup).
+3. Extração de texto: Acessar cada link coletado para extrair o conteúdo completo do artigo (BeautifulSoup).
+4. Armazenamento (sqlite): Salvar todos os dados coletados e extraídos em um banco de dados local para acesso e gestão eficientes.
+5. Sumarização: Gerar resumos curtos dos textos completos usando um modelo de IA (biblioteca Transformers).
+6. Clusterização: Agrupar notícias com temas semelhantes transformando resumos em vetores (TF-IDF) e aplicando K-Means.
+7. Interpretação de clusters: Analisar os grupos formados para identificar os temas principais e atribuir rótulos descritivos.
+8. Seleção relevante: Pontuar e selecionar as 15 notícias mais estratégicas para conteúdo, baseando-se em critérios definidos (palavras-chave, marcas, etc.).
+9. Criação da api: Construir uma interface para acessar os dados processados do banco de dados (Framework web como Flask).
+10. Criação do site: Desenvolver uma interface visual para exibir as notícias, resumos, temas e as 15 mais relevantes (HTML/CSS/JS ou framework frontend).
+11. Finish task: Apresentar o pipeline completo, a API e o site funcionando.
+
+Cada uma dessas etapas constrói sobre a anterior, transformando raw data (dados brutos) da web em insights acionáveis para a criação de conteúdo estratégico.
