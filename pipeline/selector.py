@@ -1,11 +1,14 @@
 # ETAPA 6: SELEÇÃO POR RELEVÂNCIA ESTRATÉGICA
 """
 Módulo responsável pela seleção das notícias mais estratégicas para conteúdo
+Refatorado para usar banco auxiliar e principal
 """
 
 import pandas as pd
 import re
-from .config import RELEVANCE_KEYWORDS
+from config.config import RELEVANCE_KEYWORDS
+from database.aux_operations import get_aux_operations
+from database.main_operations import get_main_operations
 
 
 def calcular_score(texto):
@@ -33,58 +36,85 @@ def calcular_score(texto):
     return score
 
 
-def selecionar_noticias_estrategicas(df_noticias, df_cluster, top_n=15):
+def selecionar_noticias_estrategicas(top_n=15):
     """
     Seleciona as notícias mais estratégicas para conteúdo de Instagram
+    e transfere para o banco principal
 
     Args:
-        df_noticias: DataFrame completo com notícias
-        df_cluster: DataFrame filtrado com notícias válidas
         top_n: Número de notícias a selecionar
 
     Returns:
-        DataFrame com as notícias mais estratégicas
+        Lista de notícias selecionadas
     """
-    if df_cluster.empty:
-        print("ERRO: DataFrame 'df_cluster' vazio.")
-        return pd.DataFrame()
+    # Obter instâncias dos gerenciadores
+    aux_ops = get_aux_operations()
+    main_ops = get_main_operations()
+
+    # Obter notícias prontas para seleção
+    noticias_prontas = aux_ops.get_news_with_resumos()
+
+    if not noticias_prontas:
+        print("ERRO: Nenhuma notícia pronta para seleção encontrada.")
+        return []
 
     print("="*70)
-    print("           INICIANDO ETAPA 7: SELEÇÃO POR RELEVÂNCIA ESTRATÉGICA")
+    print("INICIANDO SELEÇÃO POR RELEVÂNCIA ESTRATÉGICA")
     print("="*70)
 
     # Calcular scores de relevância
-    df_cluster['relevance_score'] = df_cluster.apply(
-        lambda row: calcular_score(row['titulo'] + ' ' + row['resumo']), axis=1
-    )
+    print("Calculando scores de relevância estratégica...")
+    for noticia in noticias_prontas:
+        texto_completo = noticia['titulo'] + ' ' + noticia['resumo']
+        score = calcular_score(texto_completo)
+        noticia['relevance_score'] = score
+
+    # Ordenar por score de relevância
+    noticias_prontas.sort(key=lambda x: x['relevance_score'], reverse=True)
 
     # Análise de relevância por cluster
-    cluster_scores = df_cluster.groupby(
-        'cluster')['relevance_score'].mean().sort_values(ascending=False)
+    cluster_scores = {}
+    for noticia in noticias_prontas:
+        cluster = noticia['cluster']
+        if cluster not in cluster_scores:
+            cluster_scores[cluster] = []
+        cluster_scores[cluster].append(noticia['relevance_score'])
 
-    print("\n--- [Análise] Ranking de Relevância dos Clusters ---")
+    # Calcular média por cluster
+    cluster_avg_scores = {}
+    for cluster, scores in cluster_scores.items():
+        cluster_avg_scores[cluster] = sum(scores) / len(scores)
+
+    print("\n--- Ranking de Relevância dos Clusters ---")
     print("Clusters ordenados pelo potencial de gerar conteúdo atrativo:")
-    print(cluster_scores)
+    for cluster, avg_score in sorted(cluster_avg_scores.items(), key=lambda x: x[1], reverse=True):
+        print(f"Cluster {cluster}: {avg_score:.2f} (média)")
     print("-" * 50)
 
     # Selecionar as top N notícias
-    df_insights_finais = df_cluster.nlargest(top_n, 'relevance_score')
+    noticias_selecionadas = noticias_prontas[:top_n]
 
     print("\n" + "="*70)
-    print(
-        f"           AS {top_n} NOTÍCIAS MAIS ESTRATÉGICAS PARA CONTEÚDO DE INSTAGRAM")
+    print(f"AS {top_n} NOTÍCIAS MAIS ESTRATÉGICAS PARA CONTEÚDO DE INSTAGRAM")
     print("="*70)
     print("Notícias selecionadas com base na menção a grandes marcas, campanhas e impacto.")
 
-    # Adicionar tema do cluster se disponível
-    if 'tema_cluster' in df_noticias.columns:
-        from .config import MAPA_ROTULOS
-        df_insights_finais['tema_cluster'] = df_insights_finais['cluster'].map(
-            MAPA_ROTULOS)
-        print(df_insights_finais[[
-              'cluster', 'tema_cluster', 'relevance_score', 'titulo', 'resumo']])
-    else:
-        print(
-            df_insights_finais[['cluster', 'relevance_score', 'titulo', 'resumo']])
+    # Mostrar notícias selecionadas
+    for i, noticia in enumerate(noticias_selecionadas, 1):
+        print(f"\n{i}. Score: {noticia['relevance_score']:.1f}")
+        print(f"   Título: {noticia['titulo']}")
+        print(f"   Cluster: {noticia['cluster']}")
+        print(f"   Resumo: {noticia['resumo'][:100]}...")
 
-    return df_insights_finais
+    # Transferir notícias selecionadas para o banco principal
+    print(
+        f"\n🔄 Transferindo {len(noticias_selecionadas)} notícias para o banco principal...")
+    stats_transferencia = main_ops.transfer_selected_news(
+        noticias_selecionadas)
+
+    print(f"\n✅ Seleção estratégica concluída!")
+    print(f"   - Notícias novas: {stats_transferencia['novas']}")
+    print(f"   - Timestamps atualizados: {stats_transferencia['atualizadas']}")
+    print(f"   - Falhas: {stats_transferencia['falhas']}")
+
+    return noticias_selecionadas

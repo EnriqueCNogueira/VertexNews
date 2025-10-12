@@ -1,104 +1,162 @@
 # Pipeline Inteligente de Notícias de Marketing
 
-Sistema automatizado para coletar, processar, analisar e apresentar notícias relevantes do setor de marketing digital, transformando dados brutos da web em insights estratégicos para criação de conteúdo.
+Sistema automatizado para coletar, processar, analisar e apresentar notícias relevantes do setor de marketing digital, utilizando banco de dados SQLite e cache em memória.
 
-## 🎯 Objetivo
+## 🏗️ Arquitetura Atual
 
-Transformar um grande volume de informações dispersas na web em insights valiosos, facilitando a criação de conteúdo estratégico para redes sociais, como o Instagram.
+### Sistema Implementado (v2.0)
+- **Banco Auxiliar (noticias_aux.db)**: Temporário, usado durante o processamento
+- **Banco Principal (noticias.db)**: Persistente, usado para armazenar notícias selecionadas
+- **Cache em Memória**: Armazena textos completos durante o processamento
+- **Pipeline de Processamento**: Sistema completo de coleta até seleção estratégica
 
-## 🏗️ Arquitetura do Sistema
-
-O pipeline é composto por 6 etapas principais:
-
-1. **Coleta de Dados** - Web scraping de múltiplas fontes
-2. **Extração de Texto** - Obtenção do conteúdo completo dos artigos
-3. **Sumarização** - Geração de resumos usando IA (Transformers)
-4. **Clusterização** - Agrupamento de notícias por temas similares
-5. **Interpretação** - Análise e rotulagem dos clusters
-6. **Seleção Estratégica** - Escolha das 15 notícias mais relevantes
+### Fluxo de Dados Implementado
+1. **Scraping** → Banco Auxiliar + Cache
+2. **Extração de Texto** → Cache
+3. **Sumarização** → Cache → Banco Auxiliar
+4. **Clusterização** → Banco Auxiliar
+5. **Seleção Estratégica** → Banco Auxiliar → Banco Principal
+6. **Limpeza** → Remove Banco Auxiliar
 
 ## 📁 Estrutura do Projeto
 
 ```
 Vertex/
-├── main.py                 # Orquestrador principal
-├── requirements.txt        # Dependências do projeto
-├── README.md              # Documentação
-├── prompt.txt             # Definição original do projeto
-└── pipeline/              # Módulos organizados por etapa
-    ├── __init__.py
-    ├── config.py          # Configurações globais
-    ├── collectors.py      # Coleta de dados (scrapers)
-    ├── extractor.py       # Extração de texto
-    ├── summarizer.py      # Sumarização com IA
-    ├── clustering.py      # Vetorização e clusterização
-    └── selector.py        # Seleção estratégica
+├── database/                 # Módulos de banco de dados ✅
+│   ├── init_db.py          # Inicialização dos bancos
+│   ├── aux_operations.py   # Operações no banco auxiliar
+│   ├── main_operations.py  # Operações no banco principal
+│   ├── cleanup.py          # Limpeza do banco auxiliar
+│   └── text_cache.py       # Cache em memória
+├── pipeline/                # Módulos do pipeline ✅
+│   ├── collectors.py       # Coleta de notícias
+│   ├── extractor.py        # Extração de texto
+│   ├── summarizer.py       # Sumarização com IA
+│   ├── clustering.py       # Clusterização
+│   ├── selector.py         # Seleção estratégica
+│   └── scrapers/           # Scrapers específicos
+│       ├── gkpb.py         # ✅ Completo (com imagens)
+│       ├── exame.py        # ⚠️ Falta extração de imagens
+│       ├── meio_e_mensagem.py # ⚠️ Falta extração de imagens
+│       └── mundo_do_marketing.py # ⚠️ Falta extração de imagens
+├── config/                  # Configurações ✅
+│   └── config.py           # Configurações do sistema
+├── errors/                  # Tratamento de erros ✅
+│   └── error_handler.py    # Sistema de logs e erros
+├── main.py                  # Orquestrador principal ✅
+└── requirements.txt         # Dependências ✅
 ```
 
-## 🚀 Instalação e Configuração
+## 🚀 Como Usar
 
-### Pré-requisitos
+### 1. Instalação
+```bash
+# Instalar dependências
+pip install -r requirements.txt
 
-- Python 3.8 ou superior
-- Conexão com a internet
-- 4GB de RAM mínimo (recomendado 8GB para melhor performance)
+# Baixar recursos do NLTK
+python -c "import nltk; nltk.download('stopwords')"
+```
 
-### Instalação
-
-1. **Clone ou baixe o projeto**
-   ```bash
-   # Se usando git
-   git clone <url-do-repositorio>
-   cd Vertex
-   ```
-
-2. **Crie um ambiente virtual**
-   ```bash
-   python -m venv venv
-   ```
-
-3. **Ative o ambiente virtual**
-   
-   **Windows:**
-   ```bash
-   venv\Scripts\activate
-   ```
-   
-   **Linux/Mac:**
-   ```bash
-   source venv/bin/activate
-   ```
-
-4. **Instale as dependências**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## 🎮 Como Usar
-
-### Execução Completa
-
+### 2. Executar Pipeline
 ```bash
 python main.py
 ```
 
-### Saída Esperada
+O pipeline processará automaticamente:
+- Coleta de notícias de 4 fontes
+- Extração de textos completos
+- Sumarização com IA
+- Clusterização por temas
+- Seleção das 15 mais estratégicas
+- Armazenamento no banco principal
 
-O sistema irá:
-- Coletar notícias de múltiplas fontes
-- Extrair conteúdo completo dos artigos
-- Gerar resumos usando IA
-- Agrupar notícias por temas
-- Selecionar as 15 mais estratégicas
-- Exibir relatório final com estatísticas
+## 📊 Bancos de Dados
 
-## 📊 Fontes de Dados
+### Banco Auxiliar (noticias_aux.db)
+- **Schema**: `id, titulo, link (UNIQUE), imagem, resumo, cluster`
+- **Uso**: Processamento temporário durante execução
+- **Limpeza**: Removido automaticamente ao final do pipeline
 
-O sistema coleta notícias das seguintes fontes:
+### Banco Principal (noticias.db)
+- **Schema**: `id, titulo, link (UNIQUE), imagem, resumo, cluster, data_selecao`
+- **Uso**: Dados persistentes das notícias selecionadas
+- **Persistência**: Mantido entre execuções
 
-- **Mundo do Marketing** - mundodomarketing.com.br
-- **Meio & Mensagem** - meioemensagem.com.br
-- **Exame** - exame.com/marketing
+## 🔄 Fluxo de Processamento Implementado
+
+1. **Inicialização**: Criação dos bancos de dados
+2. **Coleta**: Scraping de múltiplas fontes
+3. **Extração**: Obtenção de textos completos
+4. **Sumarização**: Geração de resumos com IA
+5. **Clusterização**: Agrupamento por similaridade
+6. **Seleção**: Escolha das 15 mais estratégicas
+7. **Transferência**: Movimentação para banco principal
+8. **Limpeza**: Remoção do banco auxiliar
+
+## 🎯 Características Implementadas
+
+- **Cache Inteligente**: Textos completos nunca salvos em banco
+- **Processamento Incremental**: Suporte a execuções múltiplas
+- **Segurança**: Proteção contra SQL Injection com consultas parametrizadas
+- **Monitoramento**: Estatísticas e logs detalhados
+- **Limpeza Automática**: Remoção de dados temporários
+- **Tratamento de Erros**: Sistema robusto de tratamento de exceções
+
+## 🛠️ Configuração
+
+### Modelos de IA Implementados
+- **Sumarização**: `unicamp-dl/ptt5-small-portuguese-vocab`
+- **Clusterização**: K-Means com TF-IDF
+
+### Fontes de Dados Implementadas
+- **GKPB**: ✅ Completo (inclui extração de imagens)
+- **Exame**: ⚠️ Básico (falta extração de imagens)
+- **Meio & Mensagem**: ⚠️ Básico (falta extração de imagens)
+- **Mundo do Marketing**: ⚠️ Básico (falta extração de imagens)
+
+## 📈 Critérios de Seleção Implementados
+
+As notícias são pontuadas baseadas em:
+
+1. **Marcas Grandes** (peso 5) - Google, Apple, Microsoft, etc.
+2. **Campanhas e Ações** (peso 3) - Lançamentos, parcerias, eventos
+3. **Palavras de Impacto** (peso 2) - Inovação, tendências, futuro
+
+## 🔧 Desenvolvimento
+
+### Melhorias Pendentes
+
+#### 1. Extração de Imagens
+- **Exame**: Implementar extração de imagens dos artigos
+- **Meio & Mensagem**: Implementar extração de imagens dos artigos
+- **Mundo do Marketing**: Implementar extração de imagens dos artigos
+
+#### 2. API REST (Não Implementada)
+- Criar `api.py` com endpoints Flask
+- Implementar endpoints:
+  - `GET /api/news` - notícias mais recentes
+  - `GET /api/news/search` - busca por termo
+  - `GET /api/news/stats` - estatísticas
+  - `GET /api/news/{id}` - notícia específica
+  - `GET /api/health` - saúde da API
+
+#### 3. Frontend Web (Não Implementado)
+- Interface para visualização das notícias
+- Dashboard com estatísticas
+- Sistema de busca e filtros
+- Exibição dos clusters e temas
+
+### Adicionar Nova Fonte
+1. Criar scraper em `pipeline/scrapers/`
+2. Adicionar chamada em `pipeline/collectors.py`
+3. Configurar seletores CSS em `pipeline/extractor.py`
+
+### Modificar Critérios de Seleção
+Editar `config/config.py` → `RELEVANCE_KEYWORDS`
+
+### Ajustar Clusterização
+Modificar `config/config.py` → `CLUSTERING_CONFIG`
 
 ## 🤖 Tecnologias Utilizadas
 
@@ -116,25 +174,19 @@ O sistema coleta notícias das seguintes fontes:
 - `transformers` - Modelos de IA para sumarização
 - `torch` - Framework de deep learning
 
+### Banco de Dados
+- `sqlite3` - Banco de dados SQLite
+
 ### Modelo de IA
 - **unicamp-dl/ptt5-small-portuguese-vocab** - Modelo especializado em português para sumarização
 
-## ⚙️ Configurações
+## 📝 Notas Importantes
 
-As configurações principais estão no arquivo `pipeline/config.py`:
-
-- **Headers HTTP** - Para requisições web
-- **Parâmetros do modelo** - Configurações de sumarização
-- **Configurações de clusterização** - Número de clusters, features, etc.
-- **Palavras-chave de relevância** - Critérios para seleção estratégica
-
-## 📈 Critérios de Seleção
-
-As notícias são pontuadas baseadas em:
-
-1. **Marcas Grandes** (peso 5) - Google, Apple, Microsoft, etc.
-2. **Campanhas e Ações** (peso 3) - Lançamentos, parcerias, eventos
-3. **Palavras de Impacto** (peso 2) - Inovação, tendências, futuro
+- Os textos completos das notícias **nunca** são salvos em banco de dados
+- O banco auxiliar é **sempre** removido após o processamento
+- Todas as operações de banco usam **consultas parametrizadas**
+- O sistema suporta **execuções múltiplas** sem conflitos
+- **API e Frontend ainda não foram implementados**
 
 ## 🔧 Solução de Problemas
 
@@ -154,6 +206,10 @@ As notícias são pontuadas baseadas em:
 - Verifique se há espaço suficiente em disco
 - O primeiro download pode demorar alguns minutos
 
+### Banco de dados não encontrado
+- Execute o pipeline primeiro: `python main.py`
+- Verifique se os arquivos `noticias.db` e `noticias_aux.db` foram criados
+
 ## 📝 Exemplo de Saída
 
 ```
@@ -161,26 +217,120 @@ As notícias são pontuadas baseadas em:
            PIPELINE INTELIGENTE DE NOTÍCIAS DE MARKETING
 ================================================================================
 Sistema automatizado para transformar dados brutos da web em insights estratégicos
+Arquitetura: SQLite + Cache em Memória
 ================================================================================
 
-🔄 ETAPA 1: COLETA DE DADOS
+[INICIALIZAÇÃO] BANCOS DE DADOS SQLITE
 --------------------------------------------------
-Executando scraper para: Mundo do Marketing
- -> Concluído. 15 notícias novas adicionadas.
+✅ Banco auxiliar inicializado: noticias_aux.db
+✅ Banco principal inicializado: noticias.db
 
-✅ 45 notícias coletadas com sucesso!
-
-🔄 ETAPA 2: EXTRAÇÃO DE TEXTO
+[ETAPA 1] COLETA DE DADOS
 --------------------------------------------------
---- Iniciando extração de texto para 45 artigos ---
-[1/45] Tentando extrair de 'Mundo do Marketing'...
+Iniciando coleta de notícias de múltiplas fontes...
+Dados serão salvos no banco auxiliar e cache em memória
+
+Coletando de: Meio & Mensagem
+Coletando de: Mundo do Marketing
+Coletando de: Exame
+Coletando de: GKPB
+
+Coleta finalizada: 45 notícias coletadas no total
+✅ 45 notícias salvas no banco auxiliar
+📊 Cache em memória: 45 textos armazenados
+
+[ETAPA 2] EXTRAÇÃO DE TEXTO
+--------------------------------------------------
+Iniciando extração de conteúdo completo para 45 artigos...
+[1/45] Extraindo conteúdo de 'https://exemplo.com'...
 ...
 
-🎉 PIPELINE EXECUTADO COM SUCESSO!
-📊 Total de notícias processadas: 45
-📈 Notícias com resumos válidos: 38
-🎯 Notícias estratégicas selecionadas: 15
+[ETAPA 3] SUMARIZAÇÃO COM IA
+--------------------------------------------------
+INICIANDO SUMARIZAÇÃO COM INTELIGÊNCIA ARTIFICIAL
+Dispositivo detectado: CPU
+Carregando modelo de IA... (Aguarde)
+Modelo carregado com sucesso!
+
+Iniciando sumarização de 38 textos...
+Progresso: 5/38 textos sumarizados. (Tempo: 45.2s)
+...
+✅ 38 textos sumarizados com sucesso
+
+[ETAPA 4] CLUSTERIZAÇÃO E ANÁLISE
+--------------------------------------------------
+INICIANDO VETORIZAÇÃO E CLUSTERIZAÇÃO
+Preparando clusterização de 38 notícias com resumos válidos...
+Executando vetorização TF-IDF...
+Executando algoritmo K-Means...
+✅ 38 clusters salvos no banco auxiliar
+
+[ETAPA 5] INTERPRETAÇÃO DOS CLUSTERS
+--------------------------------------------------
+INICIANDO INTERPRETAÇÃO E ANÁLISE DOS CLUSTERS
+Extraindo palavras-chave principais de cada cluster...
+
+Cluster 0:
+  -> Palavras-chave: marketing, digital, campanha, marca, cliente
+...
+
+[ETAPA 6] SELEÇÃO ESTRATÉGICA
+--------------------------------------------------
+INICIANDO SELEÇÃO POR RELEVÂNCIA ESTRATÉGICA
+Calculando scores de relevância estratégica...
+
+--- Ranking de Relevância dos Clusters ---
+Clusters ordenados pelo potencial de gerar conteúdo atrativo:
+Cluster 2: 8.5 (média)
+Cluster 0: 7.2 (média)
+...
+
+AS 15 NOTÍCIAS MAIS ESTRATÉGICAS PARA CONTEÚDO DE INSTAGRAM
+Notícias selecionadas com base na menção a grandes marcas, campanhas e impacto.
+
+🔄 Transferindo 15 notícias para o banco principal...
+📊 Estatísticas da transferência:
+   - Novas notícias: 12
+   - Timestamps atualizados: 3
+   - Falhas: 0
+
+[ETAPA 7] LIMPEZA DO BANCO AUXILIAR
+--------------------------------------------------
+INICIANDO LIMPEZA COMPLETA DO BANCO AUXILIAR
+✅ Banco auxiliar limpo: 45 registros removidos
+✅ VACUUM executado no banco auxiliar
+✅ Banco auxiliar removido: noticias_aux.db
+✅ Limpeza completa executada com sucesso!
+
+================================================================================
+           PIPELINE EXECUTADO COM SUCESSO!
+================================================================================
+Total de notícias no banco principal: 127
+Notícias selecionadas nesta execução: 15
+Notícias dos últimos 7 dias: 23
+================================================================================
 ```
+
+## 📈 Status do Projeto
+
+### ✅ Implementado (100%)
+- Pipeline de processamento completo
+- Sistema de banco de dados dual
+- Cache inteligente em memória
+- Sumarização com IA
+- Clusterização e análise
+- Seleção estratégica
+- Tratamento de erros robusto
+- Sistema de logs
+
+### ⚠️ Parcialmente Implementado
+- **Scrapers**: GKPB completo, outros precisam de extração de imagens
+
+### ❌ Não Implementado
+- **API REST**: Endpoints para acesso aos dados
+- **Frontend Web**: Interface de usuário
+- **Testes Automatizados**: Suite de testes
+- **Deploy**: Configuração de produção
 
 ## 🤝 Contribuição
 
@@ -206,3 +356,5 @@ Para dúvidas ou problemas:
 ---
 
 **Desenvolvido com ❤️ para transformar dados em insights estratégicos**
+
+**Status**: Pipeline completo ✅ | API pendente ❌ | Frontend pendente ❌

@@ -1,142 +1,69 @@
 # ETAPA 2: COLETORES DE DADOS
 """
 Módulo responsável pela coleta de notícias de diferentes fontes web
+Refatorado para usar banco de dados SQLite e cache em memória
 """
 
-import requests
-from bs4 import BeautifulSoup
-from urllib.parse import urljoin
-from .config import HEADERS
-
-
-def scrape_mundo_do_marketing(lista_noticias):
-    """Coleta notícias do site Mundo do Marketing"""
-    url_base = 'https://mundodomarketing.com.br/noticias'
-    print(f"Executando scraper para: Mundo do Marketing")
-    links_adicionados = set()
-    count = 0
-
-    try:
-        response = requests.get(url_base, headers=HEADERS)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            artigos = soup.find_all('div', class_='framer-11hhesp-container')
-
-            for artigo in artigos:
-                link_tag = artigo.find('a', class_='framer-1wh61m0')
-                container_texto = artigo.find('div', class_='framer-1r5yzu2')
-
-                if link_tag and container_texto:
-                    titulo_tag = container_texto.find(
-                        'h2', class_='framer-text')
-                    categoria_tag = container_texto.find(
-                        'p', class_='framer-text')
-
-                    if titulo_tag and categoria_tag:
-                        link_relativo = link_tag['href']
-                        link_completo = urljoin(url_base, link_relativo)
-
-                        if link_completo not in links_adicionados:
-                            lista_noticias.append({
-                                'fonte': 'Mundo do Marketing',
-                                'categoria': categoria_tag.get_text(strip=True),
-                                'titulo': titulo_tag.get_text(strip=True),
-                                'descricao': "Sem descrição",
-                                'link': link_completo
-                            })
-                            links_adicionados.add(link_completo)
-                            count += 1
-
-            print(f" -> Concluído. {count} notícias novas adicionadas.")
-        else:
-            print(
-                f" -> Falha ao acessar o site. Status: {response.status_code}")
-    except requests.RequestException as e:
-        print(f" -> Erro de conexão: {e}")
-
-
-def scrape_meio_e_mensagem(lista_noticias):
-    """Coleta notícias do site Meio & Mensagem"""
-    url = 'https://www.meioemensagem.com.br/marketing'
-    print(f"[EXECUTANDO] Scraper para: Meio & Mensagem")
-
-    try:
-        response = requests.get(url, headers=HEADERS)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            artigos = soup.find_all('article', class_='post')
-
-            for artigo in artigos:
-                link_tag = artigo.find('a')
-                titulo_tag = artigo.find('h3', class_='titulo')
-                descricao_tag = artigo.find('p')
-                categoria_tag = artigo.find('span', class_='categoria')
-
-                if link_tag and titulo_tag:
-                    lista_noticias.append({
-                        'fonte': 'Meio & Mensagem',
-                        'categoria': categoria_tag.get_text(strip=True) if categoria_tag else "Sem categoria",
-                        'titulo': titulo_tag.get_text(strip=True),
-                        'descricao': descricao_tag.get_text(strip=True) if descricao_tag else "Sem descrição",
-                        'link': link_tag['href']
-                    })
-
-            print(f"  -> Concluído. {len(artigos)} notícias adicionadas.")
-        else:
-            print(f"  -> Falha. Status: {response.status_code}")
-    except requests.RequestException as e:
-        print(f"  -> Erro de conexão: {e}")
-
-
-def scrape_exame(lista_noticias):
-    """Coleta notícias do site Exame"""
-    url_base = 'https://exame.com'
-    url = f'{url_base}/marketing/'
-    print(f"[DEFINIÇÃO] Lendo scraper para: Exame")
-
-    try:
-        response = requests.get(url, headers=HEADERS)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.content, 'html.parser')
-            artigos = soup.find_all('div', class_='sc-dbce6183-0')
-            count = 0
-
-            for artigo in artigos:
-                h3_tag = artigo.find('h3', class_='headline-extra-small')
-                categoria_tag = artigo.find('span', class_='label-small')
-
-                if h3_tag and h3_tag.a:
-                    link_relativo = h3_tag.a['href']
-                    link_completo = urljoin(url_base, link_relativo)
-
-                    lista_noticias.append({
-                        'fonte': 'Exame',
-                        'categoria': categoria_tag.get_text(strip=True) if categoria_tag else "Marketing",
-                        'titulo': h3_tag.a.get_text(strip=True),
-                        'descricao': "Sem descrição",
-                        'link': link_completo
-                    })
-                    count += 1
-
-            print(f" -> Concluído. {count} notícias adicionadas.")
-            return count
-        return 0
-    except requests.RequestException:
-        print(" -> Erro de conexão")
-        return 0
+from .scrapers import scrape_mundo_do_marketing, scrape_meio_e_mensagem, scrape_exame, scrape_gkpb
+from database.aux_operations import get_aux_operations
+from database.text_cache import get_text_cache
 
 
 def coletar_noticias():
-    """Executa todos os scrapers e retorna lista consolidada de notícias"""
-    print("--- Iniciando processo de coleta de dados de múltiplas fontes ---")
-    noticias_coletadas = []
+    """
+    Executa todos os scrapers e salva dados no banco auxiliar
+    Os textos completos são armazenados no cache em memória
+    """
+    print("Iniciando coleta de notícias de múltiplas fontes...")
+    print("Dados serão salvos no banco auxiliar e cache em memória")
 
+    # Obter instâncias dos gerenciadores
+    aux_ops = get_aux_operations()
+    text_cache = get_text_cache()
+
+    # Limpar cache anterior
+    text_cache.clear_cache()
+
+    noticias_coletadas = []
+    noticias_salvas = 0
+
+    print("\nColetando de: Meio & Mensagem")
     scrape_meio_e_mensagem(noticias_coletadas)
+
+    print("\nColetando de: Mundo do Marketing")
     scrape_mundo_do_marketing(noticias_coletadas)
+
+    print("\nColetando de: Exame")
     scrape_exame(noticias_coletadas)
 
-    print("\n--- Processo de coleta finalizado ---")
+    print("\nColetando de: GKPB")
+    scrape_gkpb(noticias_coletadas)
+
     print(
-        f"Total de notícias coletadas de todas as fontes: {len(noticias_coletadas)}")
+        f"\nColeta finalizada: {len(noticias_coletadas)} notícias coletadas no total")
+
+    # Salvar notícias no banco auxiliar e textos no cache
+    print("\nSalvando notícias no banco auxiliar...")
+    for noticia in noticias_coletadas:
+        # Salvar dados básicos no banco auxiliar
+        success = aux_ops.insert_news_basic(
+            titulo=noticia['titulo'],
+            link=noticia['link'],
+            imagem=noticia.get('foto')
+        )
+
+        if success:
+            noticias_salvas += 1
+
+        # Armazenar texto completo no cache (se disponível)
+        if 'texto_completo' in noticia and noticia['texto_completo']:
+            text_cache.store_text(noticia['link'], noticia['texto_completo'])
+
+    print(f"✅ {noticias_salvas} notícias salvas no banco auxiliar")
+
+    # Mostrar estatísticas do cache
+    cache_stats = text_cache.get_cache_stats()
+    print(
+        f"📊 Cache em memória: {cache_stats['total_texts']} textos armazenados")
 
     return noticias_coletadas

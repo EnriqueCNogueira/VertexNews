@@ -3,16 +3,95 @@ Definição do Projeto: Pipeline Inteligente de Notícias de Marketing
 Este projeto visa construir um sistema automatizado (um "pipeline") capaz de coletar, processar, analisar e apresentar notícias relevantes do setor de marketing digital. A finalidade principal é transformar um grande volume de informações dispersas na web em insights valiosos, facilitando a criação de conteúdo estratégico para redes sociais, como o Instagram.
 
 Etapas principais do Projeto:
-1. Configuração inicial: Preparar o ambiente e importar as ferramentas (bibliotecas Python) necessárias para todo o processo.
-2. Coleta de dados: Obter links e metadados básicos de notícias de diversas fontes web usando web scraping (Requests + BeautifulSoup).
-3. Extração de texto: Acessar cada link coletado para extrair o conteúdo completo do artigo (BeautifulSoup).
-4. Armazenamento (sqlite): Salvar todos os dados coletados e extraídos em um banco de dados local para acesso e gestão eficientes.
-5. Sumarização: Gerar resumos curtos dos textos completos usando um modelo de IA (biblioteca Transformers).
-6. Clusterização: Agrupar notícias com temas semelhantes transformando resumos em vetores (TF-IDF) e aplicando K-Means.
-7. Interpretação de clusters: Analisar os grupos formados para identificar os temas principais e atribuir rótulos descritivos.
-8. Seleção relevante: Pontuar e selecionar as 15 notícias mais estratégicas para conteúdo, baseando-se em critérios definidos (palavras-chave, marcas, etc.).
-9. Criação da api: Construir uma interface para acessar os dados processados do banco de dados (Framework web como Flask).
-10. Criação do site: Desenvolver uma interface visual para exibir as notícias, resumos, temas e as 15 mais relevantes (HTML/CSS/JS ou framework frontend).
-11. Finish task: Apresentar o pipeline completo, a API e o site funcionando.
+
+✅ 1. Configuração inicial: Preparar o ambiente e importar as ferramentas (bibliotecas Python) necessárias para todo o processo.
+   - Ambiente virtual criado
+   - Dependências instaladas (requirements.txt)
+   - Estrutura de módulos organizada
+
+✅ 2. Coleta de dados: Obter links e metadados básicos de notícias de diversas fontes web usando web scraping (Requests + BeautifulSoup).
+   - Scrapers implementados para:
+     * GKPB (completo - inclui extração de imagens)
+     * Exame (básico - falta extração de imagens)
+     * Meio & Mensagem (básico - falta extração de imagens)
+     * Mundo do Marketing (básico - falta extração de imagens)
+
+✅ 3. Extração de texto: Acessar cada link coletado para extrair o conteúdo completo do artigo (BeautifulSoup).
+   - Sistema de extração implementado com seletores específicos por fonte
+   - Cache em memória para textos completos
+
+✅ 4. Armazenamento (sqlite): Salvar todos os dados coletados e extraídos em um banco de dados local para acesso e gestão eficientes.
+   - Arquitetura de dois bancos implementada:
+     * Banco auxiliar (noticias_aux.db) - temporário para processamento
+     * Banco principal (noticias.db) - persistente para API
+   - Sistema de operações CRUD completo
+   - Cache inteligente em memória
+
+✅ 5. Sumarização: Gerar resumos curtos dos textos completos usando um modelo de IA (biblioteca Transformers).
+   - Modelo unicamp-dl/ptt5-small-portuguese-vocab implementado
+   - Sistema de sumarização com tratamento de erros
+   - Otimização para CPU/GPU
+
+✅ 6. Clusterização: Agrupar notícias com temas semelhantes transformando resumos em vetores (TF-IDF) e aplicando K-Means.
+   - Vetorização TF-IDF implementada
+   - Algoritmo K-Means configurável
+   - Sistema de interpretação de clusters
+
+✅ 7. Interpretação de clusters: Analisar os grupos formados para identificar os temas principais e atribuir rótulos descritivos.
+   - Extração de palavras-chave por cluster
+   - Sistema de pontuação de relevância
+   - Análise estatística dos grupos
+
+✅ 8. Seleção relevante: Pontuar e selecionar as 15 notícias mais estratégicas para conteúdo, baseando-se em critérios definidos (palavras-chave, marcas, etc.).
+   - Sistema de pontuação baseado em:
+     * Marcas grandes (peso 5)
+     * Campanhas e ações (peso 3)
+     * Palavras de impacto (peso 2)
+   - Transferência automática para banco principal
+   - Limpeza do banco auxiliar
+
+🔄 9. Criação da API: Construir uma interface para acessar os dados processados do banco de dados (Framework web como Flask).
+   - STATUS: Planejado mas não implementado
+   - Endpoints necessários:
+     * GET /api/news - notícias mais recentes
+     * GET /api/news/search - busca por termo
+     * GET /api/news/stats - estatísticas
+     * GET /api/news/{id} - notícia específica
+     * GET /api/health - saúde da API
+
+🔄 10. Criação do site: Desenvolver uma interface visual para exibir as notícias, resumos, temas e as 15 mais relevantes (HTML/CSS/JS ou framework frontend).
+    - STATUS: Não implementado
+    - Interface necessária para:
+      * Visualização das notícias selecionadas
+      * Exibição dos clusters e temas
+      * Busca e filtros
+      * Dashboard com estatísticas
+
+🔄 11. Melhorias pendentes:
+    - Extração de imagens para sites Exame, Meio & Mensagem e Mundo do Marketing
+    - Implementação da API REST
+    - Desenvolvimento do frontend
+    - Testes automatizados
+    - Documentação da API
+
+🔄 12. Finish task: Apresentar o pipeline completo, a API e o site funcionando.
+    - STATUS: Em desenvolvimento
+    - Pipeline de processamento: ✅ Completo
+    - API REST: ❌ Pendente
+    - Site frontend: ❌ Pendente
 
 Cada uma dessas etapas constrói sobre a anterior, transformando raw data (dados brutos) da web em insights acionáveis para a criação de conteúdo estratégico.
+
+ARQUITETURA ATUAL:
+- Pipeline de processamento: 100% funcional
+- Banco de dados: Sistema completo com dois bancos
+- Cache inteligente: Implementado
+- Tratamento de erros: Sistema robusto
+- Logs e monitoramento: Implementado
+
+PRÓXIMOS PASSOS:
+1. Implementar API REST com Flask
+2. Desenvolver interface web frontend
+3. Melhorar extração de imagens nos scrapers
+4. Adicionar testes automatizados
+5. Documentar API e deploy

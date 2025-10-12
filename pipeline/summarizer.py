@@ -1,12 +1,16 @@
 # ETAPA 4: SUMARIZAÇÃO COM TRANSFORMERS
 """
 Módulo responsável pela sumarização dos textos usando modelos de IA
+Refatorado para usar cache em memória e banco auxiliar
 """
 
 import torch
 from transformers import pipeline
 import time
-from .config import MODEL_CONFIG
+from config.config import MODEL_CONFIG
+from errors.error_handler import error_handler
+from database.aux_operations import get_aux_operations
+from database.text_cache import get_text_cache
 
 
 def inicializar_summarizer():
@@ -18,48 +22,52 @@ def inicializar_summarizer():
     """
     device = 0 if torch.cuda.is_available() else -1
     print("="*60)
-    print("INICIANDO ETAPA 3: SUMARIZAÇÃO EM FILA COM TRANSFORMERS")
+    print("INICIANDO SUMARIZAÇÃO COM INTELIGÊNCIA ARTIFICIAL")
     print(f"Dispositivo detectado: {'GPU' if device == 0 else 'CPU'}")
     print(
-        f"Otimização: Textos de entrada serão truncados em {MODEL_CONFIG['max_length']} caracteres.")
+        f"Otimização: Textos serão truncados em {MODEL_CONFIG['max_length']} caracteres.")
     print("="*60)
 
     try:
-        print("\nCarregando o modelo de IA... (Aguarde um momento)")
+        print("\nCarregando modelo de IA... (Aguarde)")
         summarizer = pipeline(
             "summarization", model=MODEL_CONFIG['model_name'], device=device)
         print("Modelo carregado com sucesso!")
         return summarizer
     except Exception as e:
-        print(f"Erro ao carregar o modelo: {e}")
+        error_handler.handle_error(
+            e, "Inicialização do modelo de IA", continue_execution=False)
         raise
 
 
-def sumarizar_textos(df_noticias, textos_para_sumarizar, indices_validos):
+def sumarizar_textos():
     """
-    Sumariza todos os textos coletados
-
-    Args:
-        df_noticias: DataFrame com as notícias
-        textos_para_sumarizar: Lista de textos para sumarizar
-        indices_validos: Lista de índices válidos no DataFrame
+    Sumariza todos os textos coletados do cache em memória
+    e salva os resumos no banco auxiliar
 
     Returns:
-        DataFrame atualizado com resumos
+        Número de textos sumarizados com sucesso
     """
-    if not textos_para_sumarizar or not indices_validos:
-        print("ERRO: Listas de textos ou índices vazias.")
-        return df_noticias
+    # Obter instâncias dos gerenciadores
+    aux_ops = get_aux_operations()
+    text_cache = get_text_cache()
+
+    # Obter textos do cache
+    textos_cache = text_cache.get_texts_for_summarization()
+
+    if not textos_cache:
+        print("ERRO: Nenhum texto encontrado no cache para sumarização.")
+        return 0
 
     try:
         summarizer = inicializar_summarizer()
-        total_textos = len(textos_para_sumarizar)
+        total_textos = len(textos_cache)
+        textos_sumarizados = 0
 
-        print(
-            f"\n--- Iniciando a sumarização de {total_textos} textos, um por um. ---")
+        print(f"\nIniciando sumarização de {total_textos} textos...")
         start_time = time.time()
 
-        for i, (texto, indice_df) in enumerate(zip(textos_para_sumarizar, indices_validos)):
+        for i, (link, texto) in enumerate(textos_cache):
             try:
                 # Truncar texto se necessário
                 texto_limitado = texto[:MODEL_CONFIG['max_length']]
@@ -72,27 +80,38 @@ def sumarizar_textos(df_noticias, textos_para_sumarizar, indices_validos):
                     early_stopping=MODEL_CONFIG['early_stopping']
                 )[0]['summary_text']
 
-                df_noticias.loc[indice_df, 'resumo'] = resumo_gerado
+                # Salvar resumo no banco auxiliar
+                success = aux_ops.update_resumo(link, resumo_gerado)
+                if success:
+                    textos_sumarizados += 1
+
+                # Remover texto do cache após sumarização
+                text_cache.remove_text(link)
 
                 # Mostrar progresso a cada 5 textos
                 if (i + 1) % 5 == 0 or (i + 1) == total_textos:
                     tempo_passado = time.time() - start_time
                     print(
-                        f"Progresso: {i + 1}/{total_textos} sumarizados. (Tempo: {tempo_passado:.2f} segundos)")
+                        f"Progresso: {i + 1}/{total_textos} textos sumarizados. (Tempo: {tempo_passado:.2f}s)")
 
             except Exception as e:
-                print(
-                    f"ERRO ao sumarizar a notícia de índice {indice_df}: {e}")
-                df_noticias.loc[indice_df,
-                                'resumo'] = f"Falha na sumarização: {e}"
+                error_handler.handle_error(
+                    e, f"Sumarização de notícia {link}")
+
+                # Marcar como falha no banco auxiliar
+                aux_ops.update_resumo(link, f"Falha na sumarização: {e}")
                 continue
 
-        print("\n--- Sumarização sequencial concluída com sucesso! ---")
-        print("\n--- Tabela Final com Notícias e Resumos (Amostra) ---")
-        print(df_noticias[['fonte', 'titulo', 'resumo']].head())
+        print(
+            f"\n✅ Sumarização concluída: {textos_sumarizados}/{total_textos} textos processados com sucesso!")
 
-        return df_noticias
+        # Mostrar estatísticas do cache após sumarização
+        cache_stats = text_cache.get_cache_stats()
+        print(
+            f"📊 Cache após sumarização: {cache_stats['total_texts']} textos restantes")
+
+        return textos_sumarizados
 
     except Exception as e:
         print(f"\nOcorreu um erro crítico durante o processo: {e}")
-        return df_noticias
+        return 0
