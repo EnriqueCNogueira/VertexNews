@@ -76,12 +76,16 @@ def extrair_texto_completo(url: str, fonte: str) -> str:
             content_div = soup.find('div', class_='content') or soup.find(
                 'article') or soup.find('div', class_='post-content')
         elif fonte == 'GKPB':
-            # Seletores específicos para o GKPB
+            # Seletores genéricos para o GKPB - mais robustos
             content_div = (soup.find('div', class_='tdb_single_content') or
                            soup.find('div', class_='td-post-content') or
                            soup.find('article') or
                            soup.find('div', class_='content') or
-                           soup.find('div', {'class': lambda x: x and 'content' in x.lower()}))
+                           soup.find('div', {'class': lambda x: x and 'content' in x.lower()}) or
+                           soup.find('div', {'class': lambda x: x and 'post' in x.lower()}) or
+                           soup.find('div', {'class': lambda x: x and 'article' in x.lower()}) or
+                           soup.find('main') or
+                           soup.find('div', {'class': lambda x: x and 'text' in x.lower()}))
         elif fonte == 'Exame':
             # Tentar múltiplos seletores para o Exame devido a mudanças no layout
             content_div = (soup.find('div', class_='article-content') or

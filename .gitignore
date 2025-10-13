@@ -150,6 +150,16 @@ Thumbs.db
 temp/
 tmp/
 
+# Banco de dados SQLite (gerados automaticamente)
+noticias.db
+noticias_aux.db
+*.db-journal
+
+# Cache de modelos de IA (baixados automaticamente)
+.cache/
+transformers_cache/
+huggingface_cache/
+
 # Model files (if large)
 *.pkl
 *.joblib

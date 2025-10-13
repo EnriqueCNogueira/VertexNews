@@ -72,7 +72,7 @@ def executar_pipeline():
         # Verificar estatísticas do banco auxiliar
         counts = aux_ops.count_news()
         print(
-            f"📊 Banco auxiliar: {counts['total']} notícias, {counts['com_resumos']} com resumos")
+            f"BANCO AUXILIAR: {counts['total']} notícias, {counts['com_resumos']} com resumos")
 
         # ETAPA 2: EXTRAÇÃO DE TEXTO
         print("\n[ETAPA 2] EXTRAÇÃO DE TEXTO")
@@ -91,7 +91,7 @@ def executar_pipeline():
         # Verificar estatísticas do cache
         cache_stats = text_cache.get_cache_stats()
         print(
-            f"📊 Cache em memória: {cache_stats['total_texts']} textos armazenados")
+            f"CACHE: {cache_stats['total_texts']} textos armazenados em memória")
 
         # ETAPA 3: SUMARIZAÇÃO
         print("\n[ETAPA 3] SUMARIZAÇÃO COM IA")

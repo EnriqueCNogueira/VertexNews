@@ -59,11 +59,11 @@ def coletar_noticias():
         if 'texto_completo' in noticia and noticia['texto_completo']:
             text_cache.store_text(noticia['link'], noticia['texto_completo'])
 
-    print(f"✅ {noticias_salvas} notícias salvas no banco auxiliar")
+    print(f"SUCESSO: {noticias_salvas} notícias salvas no banco auxiliar")
 
     # Mostrar estatísticas do cache
     cache_stats = text_cache.get_cache_stats()
     print(
-        f"📊 Cache em memória: {cache_stats['total_texts']} textos armazenados")
+        f"CACHE: {cache_stats['total_texts']} textos armazenados em memória")
 
     return noticias_coletadas
