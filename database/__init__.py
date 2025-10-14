@@ -1,18 +1,46 @@
-# MÓDULO DE BANCO DE DADOS
+# MÓDULO DE BANCO DE DADOS REFATORADO
 """
-Operações de banco de dados para o pipeline de notícias
+Sistema de banco de dados simplificado para o pipeline de notícias.
+Estrutura refatorada com 3 módulos essenciais mantendo funcionalidade completa.
 """
 
-from .init_db import DatabaseInitializer, db_initializer, initialize_databases
-from .aux_operations import AuxiliaryOperations, aux_ops, get_aux_operations
-from .main_operations import MainOperations, main_ops, get_main_operations
-from .cleanup import DatabaseCleanup, cleanup_manager, cleanup_auxiliary_database
+from .db_manager import DatabaseManager, db_manager, get_db_manager
+from .config import DatabaseConfig, db_config, get_db_config
+from .validator import DataValidator, data_validator, get_validator
 from .text_cache import NewsTextCache, text_cache, get_text_cache
 
 __all__ = [
-    'DatabaseInitializer', 'db_initializer', 'initialize_databases',
-    'AuxiliaryOperations', 'aux_ops', 'get_aux_operations',
-    'MainOperations', 'main_ops', 'get_main_operations',
-    'DatabaseCleanup', 'cleanup_manager', 'cleanup_auxiliary_database',
+    # Gerenciador principal unificado
+    'DatabaseManager', 'db_manager', 'get_db_manager',
+
+    # Configuração centralizada
+    'DatabaseConfig', 'db_config', 'get_db_config',
+
+    # Validação simplificada
+    'DataValidator', 'data_validator', 'get_validator',
+
+    # Cache em memória
     'NewsTextCache', 'text_cache', 'get_text_cache'
 ]
+
+# Funções de conveniência para compatibilidade
+
+
+def initialize_databases() -> bool:
+    """
+    Função de conveniência para inicializar os bancos de dados
+
+    Returns:
+        True se inicializado com sucesso
+    """
+    return db_manager.initialize_databases()
+
+
+def cleanup_auxiliary_database() -> bool:
+    """
+    Função de conveniência para limpar o banco auxiliar
+
+    Returns:
+        True se limpo com sucesso
+    """
+    return db_manager.clear_auxiliary_database()

@@ -89,6 +89,19 @@ ARQUITETURA ATUAL:
 - Tratamento de erros: Sistema robusto
 - Logs e monitoramento: Implementado
 
+REGRAS IMPORTANTES DE CODIFICAÇÃO:
+- NUNCA usar emojis em código Python (causa UnicodeEncodeError)
+- NUNCA usar caracteres especiais que causem problemas de encoding
+- Sempre usar caracteres ASCII simples em prints e strings
+- Evitar símbolos Unicode que possam causar problemas de encoding
+- Usar apenas texto simples em mensagens de debug e logs
+
+REGRAS PARA ARQUIVOS DE TESTE:
+- Arquivos de teste podem ser criados temporariamente para debug/análise
+- SEMPRE deletar arquivos de teste após uso para não poluir o projeto
+- Usar nomes descritivos como: teste_[funcao].py, debug_[modulo].py, analise_[site].py
+- Nunca commitar arquivos de teste no repositório
+
 PRÓXIMOS PASSOS:
 1. Implementar API REST com Flask
 2. Desenvolver interface web frontend

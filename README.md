@@ -23,11 +23,10 @@ Sistema automatizado para coletar, processar, analisar e apresentar notícias re
 ```
 Vertex/
 ├── database/                 # Módulos de banco de dados ✅
-│   ├── init_db.py          # Inicialização dos bancos
-│   ├── aux_operations.py   # Operações no banco auxiliar
-│   ├── main_operations.py  # Operações no banco principal
-│   ├── cleanup.py          # Limpeza do banco auxiliar
-│   └── text_cache.py       # Cache em memória
+│   ├── config.py            # Configuração centralizada
+│   ├── db_manager.py        # Gerenciador unificado
+│   ├── validator.py         # Validação de dados
+│   └── text_cache.py        # Cache em memória
 ├── pipeline/                # Módulos do pipeline ✅
 │   ├── collectors.py       # Coleta de notícias
 │   ├── extractor.py        # Extração de texto

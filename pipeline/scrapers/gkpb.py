@@ -16,35 +16,28 @@ def scrape_gkpb(lista_noticias):
     print(f"  Conectando ao site GKPB...")
 
     try:
-        response = requests.get(url, headers=HEADERS, timeout=15)
+        response = requests.get(url, headers=HEADERS, timeout=5)
         if response.status_code == 200:
+            # Garantir encoding correto para caracteres especiais
+            response.encoding = response.apparent_encoding or 'utf-8'
             soup = BeautifulSoup(response.content, 'html.parser')
 
-            # Usar seletores mais genéricos para encontrar artigos
-            artigos = (soup.find_all('article') or
-                       soup.find_all('div', {'class': lambda x: x and 'post' in x.lower()}) or
-                       soup.find_all('div', {'class': lambda x: x and 'item' in x.lower()}) or
-                       soup.find_all('div', {'class': lambda x: x and 'card' in x.lower()}) or
-                       soup.find_all('div', class_='tdb_module_loop'))
+            # Usar seletores específicos para o GKPB baseados na análise HTML
+            artigos = soup.find_all(
+                'div', {'class': lambda x: x and 'tdb_module_header' in x and 'td_module_wrap' in x})
 
             count = 0
             for artigo in artigos:
                 try:
-                    # Buscar título e link de forma genérica
-                    titulo_tag = (artigo.find('h1') or
-                                  artigo.find('h2') or
-                                  artigo.find('h3') or
-                                  artigo.find('h4'))
-
+                    # Buscar título e link específicos para GKPB
+                    titulo_tag = artigo.find(
+                        'h3', {'class': lambda x: x and 'entry-title' in x})
                     if not titulo_tag:
                         continue
 
                     link_tag = titulo_tag.find('a')
                     if not link_tag:
-                        # Tentar encontrar link em outros lugares do artigo
-                        link_tag = artigo.find('a')
-                        if not link_tag:
-                            continue
+                        continue
 
                     titulo = link_tag.get_text(strip=True)
                     link = link_tag.get('href')
@@ -59,26 +52,32 @@ def scrape_gkpb(lista_noticias):
                     categoria = categoria_tag.get_text(
                         strip=True) if categoria_tag else "Marketing"
 
-                    # Buscar imagem de forma genérica
+                    # Buscar imagem específica para GKPB (usando data-bg)
                     foto_url = ""
-                    img_tag = (artigo.find('img') or
-                               artigo.find('div', {'class': lambda x: x and 'image' in x.lower()}) or
-                               artigo.find('div', {'class': lambda x: x and 'thumb' in x.lower()}))
 
-                    if img_tag:
-                        if img_tag.name == 'img':
+                    # Procurar por qualquer div com data-bg (método que funciona)
+                    img_divs = artigo.find_all(attrs={'data-bg': True})
+                    if img_divs:
+                        foto_url = img_divs[0].get('data-bg', '')
+
+                    # Fallback: procurar por outras divs com background-image
+                    if not foto_url:
+                        img_divs = artigo.find_all(
+                            'div', {'class': lambda x: x and 'thumb' in x.lower()})
+                        for div in img_divs:
+                            style = div.get('style', '')
+                            if 'background-image' in style:
+                                import re
+                                match = re.search(r'url\("?([^"]+)"?\)', style)
+                                if match:
+                                    foto_url = match.group(1)
+                                    break
+
+                    # Fallback: procurar por tags img tradicionais
+                    if not foto_url:
+                        img_tag = artigo.find('img')
+                        if img_tag:
                             foto_url = img_tag.get('src', '')
-                        else:
-                            # Para divs com imagem de fundo
-                            foto_url = img_tag.get('data-bg', '')
-                            if not foto_url:
-                                style = img_tag.get('style', '')
-                                if 'background-image' in style:
-                                    import re
-                                    match = re.search(
-                                        r'url\("?([^"]+)"?\)', style)
-                                    if match:
-                                        foto_url = match.group(1)
 
                     # Buscar data de forma genérica
                     data_tag = (artigo.find('time') or

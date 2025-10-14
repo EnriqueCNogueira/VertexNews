@@ -7,8 +7,7 @@ Refatorado para usar banco auxiliar e principal
 import pandas as pd
 import re
 from config.config import RELEVANCE_KEYWORDS
-from database.aux_operations import get_aux_operations
-from database.main_operations import get_main_operations
+from database import get_db_manager
 
 
 def calcular_score(texto):
@@ -39,7 +38,7 @@ def calcular_score(texto):
 def selecionar_noticias_estrategicas(top_n=15):
     """
     Seleciona as notícias mais estratégicas para conteúdo de Instagram
-    e transfere para o banco principal
+    e transfere para o banco principal com controle de postagem
 
     Args:
         top_n: Número de notícias a selecionar
@@ -47,27 +46,22 @@ def selecionar_noticias_estrategicas(top_n=15):
     Returns:
         Lista de notícias selecionadas
     """
-    # Obter instâncias dos gerenciadores
-    aux_ops = get_aux_operations()
-    main_ops = get_main_operations()
+    # Obter instância do gerenciador unificado
+    db_manager = get_db_manager()
 
-    # Obter notícias prontas para seleção
-    noticias_prontas = aux_ops.get_news_with_resumos()
+    # ETAPA 1: Obter notícias prontas para seleção
+    noticias_prontas = db_manager.get_news_for_selection()
 
     if not noticias_prontas:
         print("ERRO: Nenhuma notícia pronta para seleção encontrada.")
         return []
 
-    print("="*70)
-    print("INICIANDO SELEÇÃO POR RELEVÂNCIA ESTRATÉGICA")
-    print("="*70)
-
     # Calcular scores de relevância
-    print("Calculando scores de relevância estratégica...")
     for noticia in noticias_prontas:
         texto_completo = noticia['titulo'] + ' ' + noticia['resumo']
         score = calcular_score(texto_completo)
         noticia['relevance_score'] = score
+        noticia['score'] = score  # Adicionar score para transferência
 
     # Ordenar por score de relevância
     noticias_prontas.sort(key=lambda x: x['relevance_score'], reverse=True)
@@ -85,36 +79,19 @@ def selecionar_noticias_estrategicas(top_n=15):
     for cluster, scores in cluster_scores.items():
         cluster_avg_scores[cluster] = sum(scores) / len(scores)
 
-    print("\n--- Ranking de Relevância dos Clusters ---")
-    print("Clusters ordenados pelo potencial de gerar conteúdo atrativo:")
-    for cluster, avg_score in sorted(cluster_avg_scores.items(), key=lambda x: x[1], reverse=True):
-        print(f"Cluster {cluster}: {avg_score:.2f} (média)")
-    print("-" * 50)
-
     # Selecionar as top N notícias
     noticias_selecionadas = noticias_prontas[:top_n]
 
-    print("\n" + "="*70)
-    print(f"AS {top_n} NOTÍCIAS MAIS ESTRATÉGICAS PARA CONTEÚDO DE INSTAGRAM")
-    print("="*70)
-    print("Notícias selecionadas com base na menção a grandes marcas, campanhas e impacto.")
+    # ETAPA 2: Arquivar notícias postadas que NÃO foram re-selecionadas
+    # Obter links das notícias selecionadas
+    links_selecionados = [noticia['link'] for noticia in noticias_selecionadas]
 
-    # Mostrar notícias selecionadas
-    for i, noticia in enumerate(noticias_selecionadas, 1):
-        print(f"\n{i}. Score: {noticia['relevance_score']:.1f}")
-        print(f"   Título: {noticia['titulo']}")
-        print(f"   Cluster: {noticia['cluster']}")
-        print(f"   Resumo: {noticia['resumo'][:100]}...")
+    # Arquivar apenas as notícias postadas que não foram re-selecionadas
+    archived_count = db_manager.archive_posted_news(
+        keep_selected_links=links_selecionados)
 
     # Transferir notícias selecionadas para o banco principal
-    print(
-        f"\n🔄 Transferindo {len(noticias_selecionadas)} notícias para o banco principal...")
-    stats_transferencia = main_ops.transfer_selected_news(
+    stats_transferencia = db_manager.transfer_selected_news(
         noticias_selecionadas)
-
-    print(f"\n✅ Seleção estratégica concluída!")
-    print(f"   - Notícias novas: {stats_transferencia['novas']}")
-    print(f"   - Timestamps atualizados: {stats_transferencia['atualizadas']}")
-    print(f"   - Falhas: {stats_transferencia['falhas']}")
 
     return noticias_selecionadas

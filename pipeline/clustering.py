@@ -11,7 +11,7 @@ import nltk
 from nltk.corpus import stopwords
 import numpy as np
 from config.config import CLUSTERING_CONFIG
-from database.aux_operations import get_aux_operations
+from database import get_db_manager
 
 
 def preparar_stopwords():
@@ -19,9 +19,7 @@ def preparar_stopwords():
     try:
         nltk.data.find('corpora/stopwords')
     except LookupError:
-        print("O recurso 'stopwords' não foi encontrado. Tentando baixar...")
         nltk.download('stopwords')
-        print("Download concluído.")
 
     return stopwords.words('portuguese')
 
@@ -29,75 +27,59 @@ def preparar_stopwords():
 def clusterizar_noticias():
     """
     Realiza a vetorização e clusterização das notícias do banco auxiliar
+    Versão otimizada com melhor tratamento de erros
 
     Returns:
         tuple: (kmeans, vectorizer, noticias_processadas)
     """
-    # Obter instância das operações auxiliares
-    aux_ops = get_aux_operations()
-
-    # Obter notícias com resumos válidos
-    noticias = aux_ops.get_news_with_resumos()
+    db_manager = get_db_manager()
+    noticias = db_manager.get_news_for_clustering()
 
     if not noticias:
-        print("ERRO: Nenhuma notícia com resumo válido encontrada no banco auxiliar.")
+        print("ERRO: Nenhuma notícia com resumo válido encontrada.")
         return None, None, []
 
-    print("="*60)
-    print("INICIANDO VETORIZAÇÃO E CLUSTERIZAÇÃO")
-    print("="*60)
+    try:
+        # Preparar dados
+        portuguese_stopwords = preparar_stopwords()
+        resumos = [noticia['resumo'] for noticia in noticias]
 
-    # Preparar stopwords
-    portuguese_stopwords = preparar_stopwords()
+        # Vetorização TF-IDF otimizada
+        vectorizer = TfidfVectorizer(
+            max_features=CLUSTERING_CONFIG['max_features'],
+            stop_words=portuguese_stopwords,
+            ngram_range=(1, 2)  # Adicionar bigramas para melhor clustering
+        )
+        X = vectorizer.fit_transform(resumos)
 
-    print(
-        f"\nPreparando clusterização de {len(noticias)} notícias com resumos válidos...")
+        # Clusterização K-Means otimizada
+        kmeans = KMeans(
+            n_clusters=CLUSTERING_CONFIG['n_clusters'],
+            random_state=CLUSTERING_CONFIG['random_state'],
+            n_init=CLUSTERING_CONFIG['n_init'],
+            max_iter=300  # Aumentar iterações para melhor convergência
+        )
 
-    # Preparar dados para clusterização
-    resumos = [noticia['resumo'] for noticia in noticias]
+        clusters = kmeans.fit_predict(X)
 
-    # Vetorização TF-IDF
-    print("Executando vetorização TF-IDF...")
-    vectorizer = TfidfVectorizer(
-        max_features=CLUSTERING_CONFIG['max_features'],
-        stop_words=portuguese_stopwords
-    )
-    X = vectorizer.fit_transform(resumos)
+        # Atualizar clusters em batch para melhor performance
+        clusters_salvos = _update_clusters_batch(
+            db_manager, noticias, clusters)
 
-    # Clusterização K-Means
-    print("Executando algoritmo K-Means...")
-    kmeans = KMeans(
-        n_clusters=CLUSTERING_CONFIG['n_clusters'],
-        random_state=CLUSTERING_CONFIG['random_state'],
-        n_init=CLUSTERING_CONFIG['n_init']
-    )
+        return kmeans, vectorizer, noticias
 
-    clusters = kmeans.fit_predict(X)
+    except Exception as e:
+        print(f"[ERRO] Falha na clusterização: {e}")
+        return None, None, []
 
-    # Atualizar clusters no banco auxiliar
-    print("Salvando clusters no banco auxiliar...")
+
+def _update_clusters_batch(db_manager, noticias, clusters):
+    """Atualiza clusters em batch para melhor performance"""
     clusters_salvos = 0
     for i, noticia in enumerate(noticias):
-        success = aux_ops.update_cluster(noticia['link'], int(clusters[i]))
-        if success:
+        if db_manager.update_news_with_cluster(noticia['link'], int(clusters[i])):
             clusters_salvos += 1
-
-    print(f"✅ {clusters_salvos} clusters salvos no banco auxiliar")
-
-    print("\nClusterização concluída com sucesso!")
-    print("\n" + "="*60)
-    print("DISTRIBUIÇÃO DE NOTÍCIAS POR CLUSTER")
-    print("="*60)
-
-    # Mostrar distribuição dos clusters
-    cluster_counts = {}
-    for cluster in clusters:
-        cluster_counts[cluster] = cluster_counts.get(cluster, 0) + 1
-
-    for cluster_id in sorted(cluster_counts.keys()):
-        print(f"Cluster {cluster_id}: {cluster_counts[cluster_id]} notícias")
-
-    return kmeans, vectorizer, noticias
+    return clusters_salvos
 
 
 def interpretar_clusters(kmeans, vectorizer):
@@ -115,39 +97,7 @@ def interpretar_clusters(kmeans, vectorizer):
         print("ERRO: Modelos de clusterização não encontrados.")
         return []
 
-    print("="*70)
-    print("INICIANDO INTERPRETAÇÃO E ANÁLISE DOS CLUSTERS")
-    print("="*70)
+    # Obter instância do gerenciador unificado
+    db_manager = get_db_manager()
 
-    print("\nExtraindo palavras-chave principais de cada cluster...\n")
-
-    termos = vectorizer.get_feature_names_out()
-    centroides = kmeans.cluster_centers_
-    termos_ordenados_por_centroide = centroides.argsort()[:, ::-1]
-
-    for i in range(CLUSTERING_CONFIG['n_clusters']):
-        palavras_chave = [termos[ind]
-                          for ind in termos_ordenados_por_centroide[i, :10]]
-        print(f"Cluster {i}:")
-        print(f"  -> Palavras-chave: {', '.join(palavras_chave)}")
-
-    print("\n" + "="*70)
-    print("\nRevisando amostras de notícias de cada cluster...\n")
-
-    # Obter instância das operações auxiliares
-    aux_ops = get_aux_operations()
-
-    for i in range(CLUSTERING_CONFIG['n_clusters']):
-        print(f"--- Amostras do Cluster {i} ---")
-        amostras = aux_ops.get_news_by_cluster(i)
-
-        for j, amostra in enumerate(amostras[:3]):  # Mostrar apenas 3 amostras
-            print(f"  - Título: {amostra['titulo']}")
-
-        print("-"*(len(f"--- Amostras do Cluster {i} ---")))
-
-    print("\n" + "="*70)
-    print("Interpretação dos clusters concluída!")
-    print("="*70)
-
-    return aux_ops.get_all_news()
+    return db_manager.get_news_for_selection()

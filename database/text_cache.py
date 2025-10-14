@@ -14,6 +14,8 @@ class NewsTextCache:
     def __init__(self):
         """Inicializa o cache em memória"""
         self._cache: Dict[str, str] = {}
+        # Para armazenar modelos de clusterização
+        self._models: Dict[str, any] = {}
         self._lock = threading.Lock()
 
     def store_text(self, link: str, text: str) -> bool:
@@ -32,7 +34,7 @@ class NewsTextCache:
                 self._cache[link] = text
                 return True
         except Exception as e:
-            print(f"❌ Erro ao armazenar texto no cache: {e}")
+            print(f"[ERRO] Erro ao armazenar texto no cache: {e}")
             return False
 
     def get_text(self, link: str) -> Optional[str]:
@@ -49,7 +51,7 @@ class NewsTextCache:
             with self._lock:
                 return self._cache.get(link)
         except Exception as e:
-            print(f"❌ Erro ao obter texto do cache: {e}")
+            print(f"[ERRO] Erro ao obter texto do cache: {e}")
             return None
 
     def remove_text(self, link: str) -> bool:
@@ -69,7 +71,7 @@ class NewsTextCache:
                     return True
                 return False
         except Exception as e:
-            print(f"❌ Erro ao remover texto do cache: {e}")
+            print(f"[ERRO] Erro ao remover texto do cache: {e}")
             return False
 
     def get_all_texts(self) -> Dict[str, str]:
@@ -83,7 +85,7 @@ class NewsTextCache:
             with self._lock:
                 return self._cache.copy()
         except Exception as e:
-            print(f"❌ Erro ao obter todos os textos: {e}")
+            print(f"[ERRO] Erro ao obter todos os textos: {e}")
             return {}
 
     def get_texts_for_summarization(self) -> List[tuple]:
@@ -101,7 +103,7 @@ class NewsTextCache:
                     texts.append((link, formatted_text))
                 return texts
         except Exception as e:
-            print(f"❌ Erro ao obter textos para sumarização: {e}")
+            print(f"[ERRO] Erro ao obter textos para sumarizacao: {e}")
             return []
 
     def clear_cache(self) -> bool:
@@ -116,7 +118,7 @@ class NewsTextCache:
                 self._cache.clear()
                 return True
         except Exception as e:
-            print(f"❌ Erro ao limpar cache: {e}")
+            print(f"[ERRO] Erro ao limpar cache: {e}")
             return False
 
     def get_cache_stats(self) -> Dict[str, int]:
@@ -137,7 +139,7 @@ class NewsTextCache:
                     'average_length': total_chars // total_texts if total_texts > 0 else 0
                 }
         except Exception as e:
-            print(f"❌ Erro ao obter estatísticas do cache: {e}")
+            print(f"[ERRO] Erro ao obter estatisticas do cache: {e}")
             return {}
 
     def has_text(self, link: str) -> bool:
@@ -154,7 +156,58 @@ class NewsTextCache:
             with self._lock:
                 return link in self._cache
         except Exception as e:
-            print(f"❌ Erro ao verificar existência no cache: {e}")
+            print(f"[ERRO] Erro ao verificar existencia no cache: {e}")
+            return False
+
+    def store_models(self, kmeans, vectorizer) -> bool:
+        """
+        Armazena modelos de clusterização no cache
+
+        Args:
+            kmeans: Modelo K-Means treinado
+            vectorizer: Vetorizador TF-IDF treinado
+
+        Returns:
+            True se armazenado com sucesso, False caso contrário
+        """
+        try:
+            with self._lock:
+                self._models['kmeans'] = kmeans
+                self._models['vectorizer'] = vectorizer
+                return True
+        except Exception as e:
+            print(f"[ERRO] Erro ao armazenar modelos no cache: {e}")
+            return False
+
+    def get_models(self) -> tuple:
+        """
+        Obtém modelos de clusterização do cache
+
+        Returns:
+            Tupla (kmeans, vectorizer) ou (None, None) se não encontrados
+        """
+        try:
+            with self._lock:
+                kmeans = self._models.get('kmeans')
+                vectorizer = self._models.get('vectorizer')
+                return kmeans, vectorizer
+        except Exception as e:
+            print(f"[ERRO] Erro ao obter modelos do cache: {e}")
+            return None, None
+
+    def clear_models(self) -> bool:
+        """
+        Limpa os modelos do cache
+
+        Returns:
+            True se limpo com sucesso, False caso contrário
+        """
+        try:
+            with self._lock:
+                self._models.clear()
+                return True
+        except Exception as e:
+            print(f"[ERRO] Erro ao limpar modelos do cache: {e}")
             return False
 
 

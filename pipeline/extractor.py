@@ -10,8 +10,9 @@ import time
 from collections import defaultdict
 from config.config import HEADERS
 from errors.error_handler import error_handler
-from database.aux_operations import get_aux_operations
+from database import get_db_manager
 from database.text_cache import get_text_cache
+from .scraper_utils import detect_source_from_url, extract_content_meio_mensagem
 
 
 def extrair_fallback_exame(soup):
@@ -59,17 +60,24 @@ def extrair_texto_completo(url: str, fonte: str) -> str:
         Texto completo do artigo ou None se falhar
     """
     try:
-        response = requests.get(url, headers=HEADERS, timeout=15)
+        response = requests.get(url, headers=HEADERS, timeout=5)
         if response.status_code != 200:
             error_handler.handle_warning(
                 f"Status HTTP {response.status_code} para {url}", fonte)
             return None
 
+        # Garantir encoding correto para caracteres especiais
+        response.encoding = response.apparent_encoding or 'utf-8'
         soup = BeautifulSoup(response.content, 'html.parser')
         content_div = None
 
         # Seletores específicos para cada fonte
-        if fonte == 'Meio & Mensagem':
+        if fonte == 'Meio e Mensagem':
+            # Usar método específico para Meio e Mensagem
+            texto_especifico = extract_content_meio_mensagem(soup)
+            if texto_especifico:
+                return texto_especifico
+            # Se falhar, tentar métodos genéricos
             content_div = soup.find('div', class_='content') or soup.find(
                 'article') or soup.find('div', class_='post-content')
         elif fonte == 'Mundo do Marketing':
@@ -142,11 +150,11 @@ def extrair_textos_noticias():
         tuple: (textos_para_sumarizar, indices_validos, stats)
     """
     # Obter instâncias dos gerenciadores
-    aux_ops = get_aux_operations()
+    db_manager = get_db_manager()
     text_cache = get_text_cache()
 
     # Obter notícias do banco auxiliar
-    noticias = aux_ops.get_all_news()
+    noticias = db_manager.get_news_for_summarization()
 
     if not noticias:
         print("Nenhuma notícia encontrada no banco auxiliar.")
@@ -157,25 +165,11 @@ def extrair_textos_noticias():
     stats = defaultdict(lambda: {'success': 0, 'fail': 0})
     total_artigos = len(noticias)
 
-    print(
-        f"Iniciando extração de conteúdo completo para {total_artigos} artigos...")
-
     for i, noticia in enumerate(noticias):
         link = noticia['link']
 
-        # Detectar fonte baseada no domínio
-        if 'meioemensagem.com.br' in link:
-            fonte = 'Meio & Mensagem'
-        elif 'mundodomarketing.com.br' in link:
-            fonte = 'Mundo do Marketing'
-        elif 'exame.com' in link:
-            fonte = 'Exame'
-        elif 'gkpb.com.br' in link:
-            fonte = 'GKPB'
-        else:
-            fonte = 'Desconhecida'
-
-        print(f"[{i + 1}/{total_artigos}] Extraindo conteúdo de '{fonte}'...")
+        # Detectar fonte usando função utilitária
+        fonte = detect_source_from_url(link)
 
         texto = extrair_texto_completo(link, fonte)
 
@@ -189,35 +183,10 @@ def extrair_textos_noticias():
         else:
             stats[fonte]['fail'] += 1
 
+        # Mostrar progresso a cada 10 artigos
+        if (i + 1) % 10 == 0 or (i + 1) == total_artigos:
+            print(f"Progresso: {i + 1}/{total_artigos} artigos processados")
+
         time.sleep(0.5)  # Evitar sobrecarga nos servidores
-
-    # Exibir diagnóstico
-    print("\n" + "="*50)
-    print("      DIAGNÓSTICO DA EXTRAÇÃO DE CONTEÚDO")
-    print("="*50)
-
-    total_success = 0
-    total_fail = 0
-
-    for fonte, resultados in sorted(stats.items()):
-        s = resultados['success']
-        f = resultados['fail']
-        total_fonte = s + f
-
-        print(f"\nFonte: {fonte}")
-        print(f"  - SUCESSO: {s} / {total_fonte}")
-        print(
-            f"  - FALHAS:  {f} / {total_fonte} (Causa provável: paywall, login ou layout diferente)")
-
-        total_success += s
-        total_fail += f
-
-    print("\n" + "="*50)
-    print("RESUMO GERAL:")
-    print(f"  - Total de textos extraídos com sucesso: {total_success}")
-    print(f"  - Total de falhas na extração: {total_fail}")
-    print(f"  - Total de artigos processados: {total_artigos}")
-    print("="*50)
-    print("\nTextos extraídos estão prontos para sumarização.")
 
     return textos_para_sumarizar, indices_validos, stats

@@ -10,209 +10,215 @@ from pipeline.clustering import clusterizar_noticias, interpretar_clusters
 from pipeline.summarizer import sumarizar_textos
 from pipeline.extractor import extrair_textos_noticias
 from pipeline.collectors import coletar_noticias
-from database.init_db import initialize_databases
-from database.cleanup import cleanup_auxiliary_database
-from database.aux_operations import get_aux_operations
-from database.main_operations import get_main_operations
+from database import initialize_databases, cleanup_auxiliary_database, get_db_manager
 from database.text_cache import get_text_cache
 from errors.error_handler import error_handler
 import sys
 import os
-
-# Adicionar o diretório pipeline ao path
-sys.path.append(os.path.join(os.path.dirname(__file__), 'pipeline'))
-
-
-def executar_pipeline():
-    """
-    Executa o pipeline completo de processamento de notícias
-    usando banco de dados SQLite e cache em memória
-
-    Returns:
-        tuple: (noticias_processadas, noticias_selecionadas)
-    """
-    print("="*80)
-    print("           PIPELINE INTELIGENTE DE NOTÍCIAS DE MARKETING")
-    print("="*80)
-    print("Sistema automatizado para transformar dados brutos da web em insights estratégicos")
-    print("Arquitetura: SQLite + Cache em Memória")
-    print("="*80)
-
-    try:
-        # INICIALIZAÇÃO DOS BANCOS DE DADOS
-        print("\n[INICIALIZAÇÃO] BANCOS DE DADOS SQLITE")
-        print("-" * 50)
-
-        if not initialize_databases():
-            print("ERRO: Falha na inicialização dos bancos de dados.")
-            return None, None
-
-        # Obter instâncias dos gerenciadores
-        aux_ops = get_aux_operations()
-        main_ops = get_main_operations()
-        text_cache = get_text_cache()
-
-        # ETAPA 1: COLETA DE DADOS
-        print("\n[ETAPA 1] COLETA DE DADOS")
-        print("-" * 50)
-
-        try:
-            noticias_coletadas = coletar_noticias()
-        except Exception as e:
-            if not error_handler.handle_error(e, "Coleta de notícias", continue_execution=False):
-                return None, None
-
-        if not error_handler.validate_data(noticias_coletadas, 'not_empty', "Coleta de notícias"):
-            print("ERRO: Nenhuma notícia foi coletada. Verificando conectividade...")
-            return None, None
-
-        print(
-            f"SUCESSO: {len(noticias_coletadas)} notícias coletadas de todas as fontes")
-
-        # Verificar estatísticas do banco auxiliar
-        counts = aux_ops.count_news()
-        print(
-            f"BANCO AUXILIAR: {counts['total']} notícias, {counts['com_resumos']} com resumos")
-
-        # ETAPA 2: EXTRAÇÃO DE TEXTO
-        print("\n[ETAPA 2] EXTRAÇÃO DE TEXTO")
-        print("-" * 50)
-
-        try:
-            textos_para_sumarizar, indices_validos, stats = extrair_textos_noticias()
-        except Exception as e:
-            error_handler.handle_error(e, "Extração de textos")
-            return None, None
-
-        if not error_handler.validate_data(textos_para_sumarizar, 'not_empty', "Extração de textos"):
-            print("ERRO: Nenhum texto foi extraído com sucesso.")
-            return None, None
-
-        # Verificar estatísticas do cache
-        cache_stats = text_cache.get_cache_stats()
-        print(
-            f"CACHE: {cache_stats['total_texts']} textos armazenados em memória")
-
-        # ETAPA 3: SUMARIZAÇÃO
-        print("\n[ETAPA 3] SUMARIZAÇÃO COM IA")
-        print("-" * 50)
-
-        try:
-            textos_sumarizados = sumarizar_textos()
-        except Exception as e:
-            error_handler.handle_error(e, "Sumarização com IA")
-            return None, None
-
-        if textos_sumarizados == 0:
-            print("ERRO: Falha na sumarização dos textos.")
-            return None, None
-
-        print(f"✅ {textos_sumarizados} textos sumarizados com sucesso")
-
-        # ETAPA 4: CLUSTERIZAÇÃO
-        print("\n[ETAPA 4] CLUSTERIZAÇÃO E ANÁLISE")
-        print("-" * 50)
-
-        try:
-            kmeans, vectorizer, noticias_processadas = clusterizar_noticias()
-        except Exception as e:
-            error_handler.handle_error(e, "Clusterização")
-            return None, None
-
-        if kmeans is None:
-            print("ERRO: Falha na clusterização.")
-            return None, None
-
-        # ETAPA 5: INTERPRETAÇÃO DOS CLUSTERS
-        print("\n[ETAPA 5] INTERPRETAÇÃO DOS CLUSTERS")
-        print("-" * 50)
-
-        try:
-            noticias_finais = interpretar_clusters(kmeans, vectorizer)
-        except Exception as e:
-            error_handler.handle_error(e, "Interpretação de clusters")
-            # Continua execução mesmo com erro nesta etapa
-
-        # ETAPA 6: SELEÇÃO ESTRATÉGICA
-        print("\n[ETAPA 6] SELEÇÃO ESTRATÉGICA")
-        print("-" * 50)
-
-        try:
-            noticias_selecionadas = selecionar_noticias_estrategicas(top_n=15)
-        except Exception as e:
-            error_handler.handle_error(e, "Seleção estratégica")
-            noticias_selecionadas = []
-
-        # ETAPA 7: LIMPEZA
-        print("\n[ETAPA 7] LIMPEZA DO BANCO AUXILIAR")
-        print("-" * 50)
-
-        try:
-            cleanup_success = cleanup_auxiliary_database()
-            if cleanup_success:
-                print("✅ Banco auxiliar limpo e removido com sucesso")
-            else:
-                print("⚠️ Alguns problemas na limpeza do banco auxiliar")
-        except Exception as e:
-            error_handler.handle_error(e, "Limpeza do banco auxiliar")
-
-        # RESULTADO FINAL
-        print("\n" + "="*80)
-        print("           PIPELINE EXECUTADO COM SUCESSO!")
-        print("="*80)
-
-        # Estatísticas finais
-        main_stats = main_ops.get_statistics()
-        print(
-            f"Total de notícias no banco principal: {main_stats.get('total', 0)}")
-        print(
-            f"Notícias selecionadas nesta execução: {len(noticias_selecionadas)}")
-        print(
-            f"Notícias dos últimos 7 dias: {main_stats.get('ultimos_7_dias', 0)}")
-
-        # Resumo de erros e avisos
-        error_summary = error_handler.get_summary()
-        if error_summary['errors'] > 0 or error_summary['warnings'] > 0:
-            print(f"\nRESUMO DE PROBLEMAS ENCONTRADOS:")
-            print(f"   - Erros encontrados: {error_summary['errors']}")
-            print(f"   - Avisos gerados: {error_summary['warnings']}")
-            print(f"   - Log salvo em: pipeline_errors.log")
-
-        print("="*80)
-
-        return noticias_coletadas, noticias_selecionadas
-
-    except Exception as e:
-        error_handler.handle_error(
-            e, "Pipeline principal", continue_execution=False)
-        print("ERRO CRÍTICO: Pipeline interrompido.")
-        print("Verifique a conectividade com a internet e as dependências instaladas.")
-        return None, None
+import time
 
 
 def main():
-    """Função principal do orquestrador"""
-    print("Iniciando Pipeline Inteligente de Notícias de Marketing...")
-    print("Nova arquitetura: SQLite + Cache em Memória")
+    """
+    Função principal que executa o pipeline completo de notícias
+    """
+    start_time = time.time()
 
-    # Executar pipeline
-    noticias_coletadas, noticias_selecionadas = executar_pipeline()
+    # Inicializar sistema
+    if not _initialize_system():
+        return None, None
 
-    if noticias_coletadas is not None:
-        print("\nRESUMO FINAL:")
-        print(f"   - Notícias coletadas: {len(noticias_coletadas)}")
-        if noticias_selecionadas:
-            print(f"   - Insights estratégicos: {len(noticias_selecionadas)}")
+    # Obter instâncias dos gerenciadores
+    db_manager = get_db_manager()
+    text_cache = get_text_cache()
+
+    # Executar etapas do pipeline
+    pipeline_steps = [
+        ("Coleta de notícias", _execute_data_collection),
+        ("Extração de conteúdo", _execute_text_extraction),
+        ("Sumarização de textos", _execute_summarization),
+        ("Clusterização de notícias", _execute_clustering),
+        ("Análise de clusters", _execute_cluster_interpretation),
+        ("Seleção de 15 notícias", _execute_strategic_selection),
+        ("Limpeza de dados temporários", _execute_cleanup),
+    ]
+
+    for step_name, step_function in pipeline_steps:
+        print(f"\n[INICIANDO] {step_name}...")
+
+        try:
+            result = step_function(db_manager, text_cache)
+            if result is False:  # Falha crítica
+                return None, None
+            print(f"{step_name.split()[0].capitalize()} concluída")
+        except Exception as e:
+            if not error_handler.handle_error(e, step_name):
+                return None, None
+
+    # Retornar dados finais
+    try:
+        stats_finais = db_manager.get_statistics()
+        api_data = db_manager.get_api_data(limit=15)
+
+        # Calcular tempo total
+        total_time = time.time() - start_time
+        minutes = int(total_time // 60)
+        seconds = int(total_time % 60)
+
+        print(f"\nPipeline concluído com sucesso!")
+        print(f"Tempo total de execução: {minutes}m {seconds}s")
+
+        return api_data, stats_finais
+    except Exception as e:
+        error_handler.handle_error(e, "Relatório final")
+        return None, None
+
+
+def _initialize_system() -> bool:
+    """Inicializa o sistema verificando bancos de dados"""
+    if not os.path.exists("noticias.db") or not os.path.exists("noticias_aux.db"):
+        print("[INICIANDO] Inicializando bancos de dados...")
+        if not initialize_databases():
+            print("ERRO: Falha na inicialização dos bancos de dados.")
+            return False
+        print("Bancos de dados inicializados")
+    return True
+
+
+def _execute_data_collection(db_manager, text_cache) -> bool:
+    """Executa coleta de dados"""
+    try:
+        noticias_coletadas = coletar_noticias()
+        if not error_handler.validate_data(noticias_coletadas, 'not_empty', "Coleta de notícias"):
+            print("ERRO: Nenhuma notícia foi coletada.")
+            return False
+        return True
+    except Exception as e:
+        error_handler.handle_error(
+            e, "Coleta de notícias", continue_execution=False)
+        return False
+
+
+def _execute_text_extraction(db_manager, text_cache) -> bool:
+    """Executa extração de texto"""
+    try:
+        textos_para_sumarizar, indices_validos, stats = extrair_textos_noticias()
+        if not error_handler.validate_data(textos_para_sumarizar, 'not_empty', "Extração de textos"):
+            print("ERRO: Nenhum texto foi extraído com sucesso.")
+            return False
+        return True
+    except Exception as e:
+        error_handler.handle_error(e, "Extração de textos")
+        return False
+
+
+def _execute_summarization(db_manager, text_cache) -> bool:
+    """Executa sumarização"""
+    try:
+        textos_sumarizados = sumarizar_textos()
+        if textos_sumarizados == 0:
+            print("ERRO: Falha na sumarização dos textos.")
+            return False
+        return True
+    except Exception as e:
+        error_handler.handle_error(e, "Sumarização com IA")
+        return False
+
+
+def _execute_clustering(db_manager, text_cache) -> bool:
+    """Executa clusterização"""
+    try:
+        kmeans, vectorizer, noticias_processadas = clusterizar_noticias()
+        if kmeans is None:
+            print("ERRO: Falha na clusterização.")
+            return False
+
+        # Armazenar modelos para uso posterior
+        text_cache.store_models(kmeans, vectorizer)
+        return True
+    except Exception as e:
+        error_handler.handle_error(e, "Clusterização")
+        return False
+
+
+def _execute_cluster_interpretation(db_manager, text_cache) -> bool:
+    """Executa interpretação de clusters"""
+    try:
+        # Recuperar modelos do cache
+        kmeans, vectorizer = text_cache.get_models()
+        if kmeans is None or vectorizer is None:
             print(
-                "\nAs 15 notícias mais estratégicas foram selecionadas e salvas no banco principal!")
-            print("Dados prontos para consumo pela API do site.")
-        else:
-            print("   - Insights estratégicos: Não disponíveis")
-    else:
-        print("\nPipeline não pôde ser executado completamente.")
+                "AVISO: Modelos de clusterização não encontrados. Pulando interpretação.")
+            return True
 
-    print("\nExecução finalizada.")
+        interpretar_clusters(kmeans, vectorizer)
+        return True
+    except Exception as e:
+        error_handler.handle_error(e, "Interpretação de clusters")
+        return True  # Não é crítico
+
+
+def _execute_strategic_selection(db_manager, text_cache) -> bool:
+    """Executa seleção estratégica"""
+    try:
+        selecionar_noticias_estrategicas(top_n=15)
+        return True
+    except Exception as e:
+        error_handler.handle_error(e, "Seleção estratégica")
+        return True  # Não é crítico
+
+
+def _execute_cleanup(db_manager, text_cache) -> bool:
+    """Executa limpeza do banco auxiliar"""
+    try:
+        cleanup_success = cleanup_auxiliary_database()
+        return True
+    except Exception as e:
+        error_handler.handle_error(e, "Limpeza do banco auxiliar")
+        return True  # Não é crítico
+
+
+def run_pipeline():
+    """
+    Executa o pipeline completo e exibe resultados
+    """
+    try:
+        # Executar pipeline
+        api_data, stats = main()
+
+        if api_data is None:
+            print("\n[ERRO] Pipeline falhou. Verifique os logs acima.")
+            return False
+
+        return True
+
+    except KeyboardInterrupt:
+        print("\n\n[INFO] Pipeline interrompido pelo usuário.")
+        return False
+    except Exception as e:
+        print(f"\n[ERRO CRÍTICO] Falha inesperada no pipeline: {e}")
+        error_handler.handle_error(e, "Pipeline principal")
+        return False
 
 
 if __name__ == "__main__":
-    main()
+    # Verificar argumentos da linha de comando
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "--help":
+            print("PIPELINE DE NOTÍCIAS DE MARKETING")
+            print("Uso: python main.py")
+            print("Opções:")
+            print("  --help     Exibe esta ajuda")
+            print("  --test     Executa pipeline em modo de teste")
+            sys.exit(0)
+        elif sys.argv[1] == "--test":
+            print("[MODO TESTE] Executando pipeline com configurações de teste...")
+            # Aqui poderiam ser aplicadas configurações de teste
+
+    # Executar pipeline
+    success = run_pipeline()
+
+    if success:
+        sys.exit(0)
+    else:
+        sys.exit(1)

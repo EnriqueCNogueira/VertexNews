@@ -9,7 +9,7 @@ from transformers import pipeline
 import time
 from config.config import MODEL_CONFIG
 from errors.error_handler import error_handler
-from database.aux_operations import get_aux_operations
+from database import get_db_manager
 from database.text_cache import get_text_cache
 
 
@@ -21,18 +21,10 @@ def inicializar_summarizer():
         Pipeline de sumarização configurado
     """
     device = 0 if torch.cuda.is_available() else -1
-    print("="*60)
-    print("INICIANDO SUMARIZAÇÃO COM INTELIGÊNCIA ARTIFICIAL")
-    print(f"Dispositivo detectado: {'GPU' if device == 0 else 'CPU'}")
-    print(
-        f"Otimização: Textos serão truncados em {MODEL_CONFIG['max_length']} caracteres.")
-    print("="*60)
 
     try:
-        print("\nCarregando modelo de IA... (Aguarde)")
         summarizer = pipeline(
             "summarization", model=MODEL_CONFIG['model_name'], device=device)
-        print("Modelo carregado com sucesso!")
         return summarizer
     except Exception as e:
         error_handler.handle_error(
@@ -48,8 +40,8 @@ def sumarizar_textos():
     Returns:
         Número de textos sumarizados com sucesso
     """
-    # Obter instâncias dos gerenciadores
-    aux_ops = get_aux_operations()
+    # Obter instância do gerenciador unificado
+    db_manager = get_db_manager()
     text_cache = get_text_cache()
 
     # Obter textos do cache
@@ -64,7 +56,6 @@ def sumarizar_textos():
         total_textos = len(textos_cache)
         textos_sumarizados = 0
 
-        print(f"\nIniciando sumarização de {total_textos} textos...")
         start_time = time.time()
 
         for i, (link, texto) in enumerate(textos_cache):
@@ -81,34 +72,28 @@ def sumarizar_textos():
                 )[0]['summary_text']
 
                 # Salvar resumo no banco auxiliar
-                success = aux_ops.update_resumo(link, resumo_gerado)
+                success = db_manager.update_news_with_resumo(
+                    link, resumo_gerado)
                 if success:
                     textos_sumarizados += 1
 
                 # Remover texto do cache após sumarização
                 text_cache.remove_text(link)
 
-                # Mostrar progresso a cada 5 textos
+                # Mostrar progresso a cada 5 textos com tempo
                 if (i + 1) % 5 == 0 or (i + 1) == total_textos:
                     tempo_passado = time.time() - start_time
                     print(
-                        f"Progresso: {i + 1}/{total_textos} textos sumarizados. (Tempo: {tempo_passado:.2f}s)")
+                        f"Progresso: {i + 1}/{total_textos} textos sumarizados (Tempo: {tempo_passado:.1f}s)")
 
             except Exception as e:
                 error_handler.handle_error(
                     e, f"Sumarização de notícia {link}")
 
                 # Marcar como falha no banco auxiliar
-                aux_ops.update_resumo(link, f"Falha na sumarização: {e}")
+                db_manager.update_news_with_resumo(
+                    link, f"Falha na sumarização: {e}")
                 continue
-
-        print(
-            f"\n✅ Sumarização concluída: {textos_sumarizados}/{total_textos} textos processados com sucesso!")
-
-        # Mostrar estatísticas do cache após sumarização
-        cache_stats = text_cache.get_cache_stats()
-        print(
-            f"📊 Cache após sumarização: {cache_stats['total_texts']} textos restantes")
 
         return textos_sumarizados
 
