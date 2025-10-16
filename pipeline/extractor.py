@@ -175,7 +175,7 @@ def extrair_textos_noticias():
 
         if texto:
             stats[fonte]['success'] += 1
-            textos_para_sumarizar.append("summarize: " + texto)
+            textos_para_sumarizar.append(texto)
             indices_validos.append(i)
 
             # Armazenar no cache

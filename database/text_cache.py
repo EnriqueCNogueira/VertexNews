@@ -99,8 +99,7 @@ class NewsTextCache:
             with self._lock:
                 texts = []
                 for link, text in self._cache.items():
-                    formatted_text = f"summarize: {text}"
-                    texts.append((link, formatted_text))
+                    texts.append((link, text))
                 return texts
         except Exception as e:
             print(f"[ERRO] Erro ao obter textos para sumarizacao: {e}")

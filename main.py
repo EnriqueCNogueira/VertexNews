@@ -13,16 +13,40 @@ from pipeline.collectors import coletar_noticias
 from database import initialize_databases, cleanup_auxiliary_database, get_db_manager
 from database.text_cache import get_text_cache
 from errors.error_handler import error_handler
+from scripts.test_database_integrity import run_database_integrity_test
 import sys
 import os
 import time
 
 
-def main():
+def main(skip_integrity_test: bool = False):
     """
     Função principal que executa o pipeline completo de notícias
+
+    Args:
+        skip_integrity_test: Se True, pula o teste de integridade do banco de dados
     """
     start_time = time.time()
+
+    # Teste de integridade do banco de dados (obrigatório antes do pipeline)
+    if not skip_integrity_test:
+        print("=" * 60)
+        print("[TEST] EXECUTANDO TESTE DE INTEGRIDADE DO BANCO DE DADOS")
+        print("=" * 60)
+
+        if not run_database_integrity_test():
+            print(
+                "\n[ERRO] ERRO CRÍTICO: Teste de integridade do banco de dados falhou!")
+            print("   O pipeline não pode ser executado com segurança.")
+            print("   Corrija os problemas do banco de dados antes de continuar.")
+            return None, None
+
+        print("\n[OK] Teste de integridade do banco de dados passou!")
+        print("   Pipeline pode ser executado com segurança.")
+        print("=" * 60)
+    else:
+        print(
+            "[AVISO] Teste de integridade do banco de dados pulado por solicitação do usuário.")
 
     # Inicializar sistema
     if not _initialize_system():
@@ -178,13 +202,16 @@ def _execute_cleanup(db_manager, text_cache) -> bool:
         return True  # Não é crítico
 
 
-def run_pipeline():
+def run_pipeline(skip_integrity_test: bool = False):
     """
     Executa o pipeline completo e exibe resultados
+
+    Args:
+        skip_integrity_test: Se True, pula o teste de integridade do banco de dados
     """
     try:
         # Executar pipeline
-        api_data, stats = main()
+        api_data, stats = main(skip_integrity_test)
 
         if api_data is None:
             print("\n[ERRO] Pipeline falhou. Verifique os logs acima.")
@@ -203,20 +230,33 @@ def run_pipeline():
 
 if __name__ == "__main__":
     # Verificar argumentos da linha de comando
+    skip_integrity_test = False
+
     if len(sys.argv) > 1:
         if sys.argv[1] == "--help":
             print("PIPELINE DE NOTÍCIAS DE MARKETING")
             print("Uso: python main.py")
             print("Opções:")
-            print("  --help     Exibe esta ajuda")
-            print("  --test     Executa pipeline em modo de teste")
+            print("  --help                    Exibe esta ajuda")
+            print("  --test                    Executa pipeline em modo de teste")
+            print(
+                "  --skip-integrity-test     Pula o teste de integridade do banco de dados")
+            print(
+                "  --force                   Força execução mesmo com problemas de integridade")
             sys.exit(0)
         elif sys.argv[1] == "--test":
             print("[MODO TESTE] Executando pipeline com configurações de teste...")
             # Aqui poderiam ser aplicadas configurações de teste
+        elif sys.argv[1] == "--skip-integrity-test":
+            print(
+                "[AVISO] Modo de execução sem teste de integridade do banco de dados.")
+            skip_integrity_test = True
+        elif sys.argv[1] == "--force":
+            print("[AVISO] Modo de execução forçada - pulando teste de integridade.")
+            skip_integrity_test = True
 
     # Executar pipeline
-    success = run_pipeline()
+    success = run_pipeline(skip_integrity_test)
 
     if success:
         sys.exit(0)

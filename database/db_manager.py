@@ -589,7 +589,7 @@ class DatabaseManager:
                 cursor.execute("""
                     SELECT id, titulo, link, imagem, resumo, cluster, fonte, data_selecao, score, status
                     FROM noticias
-                    ORDER BY data_selecao DESC
+                    ORDER BY score DESC, data_selecao DESC
                     LIMIT ?
                 """, (limit,))
 
